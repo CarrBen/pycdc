@@ -2258,6 +2258,40 @@ PycRef<ASTNode> BuildFromCode(PycRef<PycCode> code, PycModule* mod)
                         curblock.cast<ASTWithBlock>()->setVar(name);
                     } else if (value.type() == ASTNode::NODE_CHAINSTORE) {
                         append_to_chain_store(value, name, stack, curblock);
+                    } else if (curblock->nodes().back().type() == ASTNode::NODE_CHAINSTORE &&
+                        curblock->nodes().back().cast<ASTChainStore>()->src().type() == ASTNode::NODE_OBJECT &&
+                        curblock->nodes().back().cast<ASTChainStore>()->src().cast<ASTObject>()->object() == value.cast<ASTObject>()->object())
+                    {
+                        // The most recent item in the block is a chainstore with the same value
+                        PycRef<ASTChainStore> store = curblock->nodes().back().cast<ASTChainStore>();
+                        store->append(name);
+                    } else if (stack.top().type() == ASTNode::NODE_OBJECT && 
+                        stack.top().type() == value.type()) {
+                        // Handle a store after COPY which seems to be a chainstore in Py 3.11
+                        PycRef<ASTNode> top_val = stack.top();
+                        PycRef<PycObject> val_obj = value.cast<ASTObject>()->object();
+                        PycRef<PycObject> top_obj = top_val.cast<ASTObject>()->object();
+
+                        if(val_obj == top_obj) {
+                            PycRef<ASTChainStore> store;
+                            PycRef<ASTNode> lastBlockNode = curblock->nodes().back();
+                            /* Check if the last node on the curblock is a chainstore with
+                            the same value */
+                            if(lastBlockNode.type() == ASTNode::NODE_CHAINSTORE &&
+                                lastBlockNode.cast<ASTChainStore>()->src().type() == ASTNode::NODE_OBJECT &&
+                                lastBlockNode.cast<ASTChainStore>()->src().cast<ASTObject>()->object() == val_obj) {
+                                store = lastBlockNode.cast<ASTChainStore>();
+                            } else {
+                                // New chainstore (because the value is copied) if it isn't
+                                ASTNodeList::list_t targets;
+                                store = new ASTChainStore(targets, top_val);
+                                curblock->append(store.cast<ASTNode>());
+                            }
+                            store->append(name);
+                        } else {
+                            // Normal store if values don't match
+                            curblock->append(new ASTStore(value, name));
+                        }
                     } else {
                         curblock->append(new ASTStore(value, name));
 
