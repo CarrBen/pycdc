@@ -1504,6 +1504,40 @@ PycRef<ASTNode> BuildFromCode(PycRef<PycCode> code, PycModule* mod)
                 }
             }
             break;
+        case Pyc::COPY_A:
+            {
+                stack_hist.push(stack);
+
+                // Operand for COPY indicates how many items to go back in the stack
+                for(int i=1; i<operand; i++) {
+                    stack.pop();
+                }
+
+                PycRef<ASTNode> target = stack.top();
+                stack = stack_hist.top();
+                stack_hist.pop();
+
+                // Store the same PycObject so we can compare reference equality
+                // to detect when a COPY has happened
+                PycRef<ASTNode> node;
+                switch(target.type()) {
+                    case ASTNode::NODE_OBJECT:
+                    {
+                        PycRef<PycObject> obj = target.cast<ASTObject>()->object();
+                        node = new ASTObject(obj);
+                        break;
+                    }
+                    default:
+                    {
+                        fprintf(stderr, "Unsupported ASTNode for COPY_A, Node Type: %d\n", target.type());
+                        // Copied from the opcode switch default case
+                        cleanBuild = false;
+                        return new ASTNodeList(defblock->nodes());
+                    }
+                }
+                stack.push(node);
+            }
+            break;
         case Pyc::LOAD_DEREF_A:
         case Pyc::LOAD_CLASSDEREF_A:
             stack.push(new ASTName(code->getCellVar(mod, operand)));
