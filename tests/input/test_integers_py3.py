@@ -29,3 +29,5 @@ i = -0x80000000
 print(i, repr(i))
 i = -0x80000001
 print(i, repr(i))
+i = 0x80000001
+print(i, repr(i))
