@@ -98,6 +98,14 @@ std::string PycLong::repr(PycModule* mod) const
     *aptr++ = '0';
     *aptr++ = 'x';
 
+    if (type() == TYPE_INT64 && m_size < 0) {
+        /* Negative INT64's are stored in Two's Complement */
+        bits[0] &= ~1;
+        for(auto& bit : bits) {
+           bit = ~bit;
+        }
+    }
+
     auto iter = bits.crbegin();
     if (*iter != 0)
         aptr += snprintf(aptr, 9, "%X", *iter++);
