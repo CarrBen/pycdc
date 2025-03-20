@@ -1504,6 +1504,40 @@ PycRef<ASTNode> BuildFromCode(PycRef<PycCode> code, PycModule* mod)
                 }
             }
             break;
+        case Pyc::COPY_A:
+            {
+                stack_hist.push(stack);
+
+                // Operand for COPY indicates how many items to go back in the stack
+                for(int i=1; i<operand; i++) {
+                    stack.pop();
+                }
+
+                PycRef<ASTNode> target = stack.top();
+                stack = stack_hist.top();
+                stack_hist.pop();
+
+                // Store the same PycObject so we can compare reference equality
+                // to detect when a COPY has happened
+                PycRef<ASTNode> node;
+                switch(target.type()) {
+                    case ASTNode::NODE_OBJECT:
+                    {
+                        PycRef<PycObject> obj = target.cast<ASTObject>()->object();
+                        node = new ASTObject(obj);
+                        break;
+                    }
+                    default:
+                    {
+                        fprintf(stderr, "Unsupported ASTNode for COPY_A, Node Type: %d\n", target.type());
+                        // Copied from the opcode switch default case
+                        cleanBuild = false;
+                        return new ASTNodeList(defblock->nodes());
+                    }
+                }
+                stack.push(node);
+            }
+            break;
         case Pyc::LOAD_DEREF_A:
         case Pyc::LOAD_CLASSDEREF_A:
             stack.push(new ASTName(code->getCellVar(mod, operand)));
@@ -2278,6 +2312,40 @@ PycRef<ASTNode> BuildFromCode(PycRef<PycCode> code, PycModule* mod)
                         curblock.cast<ASTWithBlock>()->setVar(name);
                     } else if (value.type() == ASTNode::NODE_CHAINSTORE) {
                         append_to_chain_store(value, name, stack, curblock);
+                    } else if (curblock->nodes().back().type() == ASTNode::NODE_CHAINSTORE &&
+                        curblock->nodes().back().cast<ASTChainStore>()->src().type() == ASTNode::NODE_OBJECT &&
+                        curblock->nodes().back().cast<ASTChainStore>()->src().cast<ASTObject>()->object() == value.cast<ASTObject>()->object())
+                    {
+                        // The most recent item in the block is a chainstore with the same value
+                        PycRef<ASTChainStore> store = curblock->nodes().back().cast<ASTChainStore>();
+                        store->append(name);
+                    } else if (stack.top().type() == ASTNode::NODE_OBJECT && 
+                        stack.top().type() == value.type()) {
+                        // Handle a store after COPY which seems to be a chainstore in Py 3.11
+                        PycRef<ASTNode> top_val = stack.top();
+                        PycRef<PycObject> val_obj = value.cast<ASTObject>()->object();
+                        PycRef<PycObject> top_obj = top_val.cast<ASTObject>()->object();
+
+                        if(val_obj == top_obj) {
+                            PycRef<ASTChainStore> store;
+                            PycRef<ASTNode> lastBlockNode = curblock->nodes().back();
+                            /* Check if the last node on the curblock is a chainstore with
+                            the same value */
+                            if(lastBlockNode.type() == ASTNode::NODE_CHAINSTORE &&
+                                lastBlockNode.cast<ASTChainStore>()->src().type() == ASTNode::NODE_OBJECT &&
+                                lastBlockNode.cast<ASTChainStore>()->src().cast<ASTObject>()->object() == val_obj) {
+                                store = lastBlockNode.cast<ASTChainStore>();
+                            } else {
+                                // New chainstore (because the value is copied) if it isn't
+                                ASTNodeList::list_t targets;
+                                store = new ASTChainStore(targets, top_val);
+                                curblock->append(store.cast<ASTNode>());
+                            }
+                            store->append(name);
+                        } else {
+                            // Normal store if values don't match
+                            curblock->append(new ASTStore(value, name));
+                        }
                     } else {
                         curblock->append(new ASTStore(value, name));
 
