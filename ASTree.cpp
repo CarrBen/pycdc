@@ -1206,7 +1206,6 @@ PycRef<ASTNode> BuildFromCode(PycRef<PycCode> code, PycModule* mod)
                             curblock = blocks.top();
                         }
                     } else {
-                        //fprintf(stderr, "Block Type: %s Pos: %d End: %d\n", curblock->type_str(), pos, curblock->end());
                         if (curblock->blktype() == ASTBlock::BLK_EXCEPT && pos == curblock->end()) {
                             // End of Except inside loop
                         } else if (curblock->blktype() == ASTBlock::BLK_CONTAINER && curblock.cast<ASTContainerBlock>()->hasExcept()) {
