@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstring>
 #include <cstdint>
 #include <stdexcept>
@@ -456,6 +457,8 @@ PycRef<ASTNode> BuildFromCode(PycRef<PycCode> code, PycModule* mod)
                 stack.pop();
                 int loadbuild_type = loadbuild.type();
                 if (loadbuild_type == ASTNode::NODE_LOADBUILDCLASS) {
+                    if (mod->verCompare(3, 0) >= 0)
+                        std::reverse(bases.begin(), bases.end());
                     PycRef<ASTNode> call = new ASTCall(function, pparamList, kwparamList);
                     stack.push(new ASTClass(call, new ASTTuple(bases), name));
                     stack_hist.pop();
