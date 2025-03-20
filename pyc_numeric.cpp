@@ -66,12 +66,24 @@ std::string PycLong::repr(PycModule* mod) const
     bits.reserve((m_value.size() + 1) / 2);
     int shift = 0, temp = 0;
     for (auto bit : m_value) {
-        temp |= unsigned(bit & 0xFFFF) << shift;
-        shift += 15;
-        if (shift >= 32) {
-            bits.push_back(temp);
-            shift -= 32;
-            temp = unsigned(bit & 0xFFFF) >> (15 - shift);
+        /* INT64's use the full 16 bits */
+        /* As there is separate logic for INT64's in the load, a separate class could be neater */
+        if (type() == TYPE_INT64) {
+            temp |= unsigned(bit & 0xFFFF) << shift;
+            shift += 16;
+            if (shift >= 32) {
+                bits.push_back(temp);
+                shift -= 32;
+                temp = 0;
+            }
+        } else {
+            temp |= unsigned(bit & 0xFFFF) << shift;
+            shift += 15;
+            if (shift >= 32) {
+                bits.push_back(temp);
+                shift -= 32;
+                temp = unsigned(bit & 0xFFFF) >> (15 - shift);
+            }
         }
     }
     if (temp)
@@ -86,8 +98,19 @@ std::string PycLong::repr(PycModule* mod) const
     *aptr++ = '0';
     *aptr++ = 'x';
 
+    if (type() == TYPE_INT64 && m_size < 0) {
+        /* Negative INT64's are stored in Two's Complement */
+        bits[0] &= ~1;
+        for(auto& bit : bits) {
+           bit = ~bit;
+        }
+    }
+
     auto iter = bits.crbegin();
-    aptr += snprintf(aptr, 9, "%X", *iter++);
+    if (*iter != 0)
+        aptr += snprintf(aptr, 9, "%X", *iter++);
+    else
+        iter++;
     while (iter != bits.rend())
         aptr += snprintf(aptr, 9, "%08X", *iter++);
     if (mod->verCompare(3, 0) < 0)

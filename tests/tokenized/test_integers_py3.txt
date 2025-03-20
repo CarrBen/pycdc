@@ -18,3 +18,5 @@ i = - 2147483648 <EOL>
 print ( i , repr ( i ) ) <EOL>
 i = - 0 x80000001 <EOL>
 print ( i , repr ( i ) ) <EOL>
+i = 0 x80000001 <EOL>
+print ( i , repr ( i ) ) <EOL>

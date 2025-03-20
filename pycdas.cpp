@@ -226,6 +226,7 @@ void output_object(PycRef<PycObject> obj, PycModule* mod, int indent,
     case PycObject::TYPE_INT:
         iprintf(pyc_output, indent, "%d\n", obj.cast<PycInt>()->value());
         break;
+    case PycObject::TYPE_INT64:
     case PycObject::TYPE_LONG:
         iprintf(pyc_output, indent, "%s\n", obj.cast<PycLong>()->repr(mod).c_str());
         break;
